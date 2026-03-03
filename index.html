@@ -120,7 +120,8 @@
         </header>
 
         <div id="game-stage" class="game-stage">
-            <div class="text-center mb-4 pointer-events-auto">
+            <!-- Removed mb-4 to center text perfectly with 3D shape -->
+            <div onclick="handleGameInteraction()" class="text-center pointer-events-auto select-none cursor-pointer">
                 <h2 id="main-text" class="font-display text-3xl md:text-5xl font-bold text-primary transition-all duration-200 text-glow opacity-90">
                     Ready?
                 </h2>
@@ -130,8 +131,9 @@
             </div>
         </div>
 
-        <div class="shrink-0 flex flex-col items-center gap-4 mb-2">
-            <div class="grid grid-cols-5 gap-2 md:gap-3 w-full max-w-3xl pointer-events-auto">
+        <!-- Reduced gap and removed bottom margin to move stats higher -->
+        <div class="shrink-0 flex flex-col items-center gap-3 pointer-events-auto">
+            <div class="grid grid-cols-5 gap-2 md:gap-3 w-full max-w-3xl">
                 <div class="stat-card rounded-xl p-2 md:p-3 flex flex-col items-center justify-center">
                     <span class="text-muted text-[9px] md:text-[10px] uppercase tracking-wider font-bold mb-1">Last</span>
                     <span id="stat-last" class="font-display text-lg md:text-2xl font-bold text-primary">--</span>
@@ -195,28 +197,79 @@
             gameStage: document.getElementById('game-stage'),
         };
 
+        let audioContext = null;
+
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }
+
+        function playSound(type) {
+            if (!audioContext) initAudio();
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            const now = audioContext.currentTime;
+            
+            if (type === 'start') {
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(600, now);
+                oscillator.frequency.exponentialRampToValueAtTime(300, now + 0.1);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                oscillator.start(now);
+                oscillator.stop(now + 0.1);
+            } 
+            else if (type === 'error') {
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(150, now);
+                oscillator.frequency.linearRampToValueAtTime(100, now + 0.2);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                oscillator.start(now);
+                oscillator.stop(now + 0.2);
+            }
+            else if (type === 'success') {
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(1200, now);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                oscillator.start(now);
+                oscillator.stop(now + 0.15);
+            }
+        }
+
         function handleGameInteraction() {
+            initAudio();
+            
             switch (currentState) {
                 case STATE.IDLE:
                 case STATE.RESULT:
                 case STATE.FALSE_START:
+                    playSound('start');
                     startGame();
                     break;
                 case STATE.WAITING:
+                    playSound('error');
                     triggerFalseStart();
                     break;
                 case STATE.READY:
+                    playSound('success');
                     recordResult();
                     break;
             }
         }
 
         function startGame() {
-            // Remove shake effect if coming from false start
             els.gameStage.classList.remove('false-start-shake');
-            
-            // FIX: Explicitly reset colors to waiting state (blue) when starting new game
-            // This ensures transition from red (false start) to blue (waiting)
             setWaitingColors();
             
             currentState = STATE.WAITING;
@@ -236,7 +289,6 @@
 
         function setWaitingColors() {
             if (!solidMesh || !wireMesh) return;
-            // Smooth transition back to blue
             solidMesh.material.emissive.setHex(0x3B82F6);
             solidMesh.material.emissiveIntensity = 0.3;
             solidMesh.material.color.setHex(0x1E293B);
@@ -310,8 +362,9 @@
                 
                 case STATE.READY:
                     els.mainText.textContent = "NOW!";
-                    els.mainText.className = "font-display text-4xl md:text-6xl font-black text-ready text-glow scale-110 transition-all duration-75";
-                    els.subText.textContent = "Click!";
+                    els.mainText.className = "font-display text-4xl md:text-6xl font-black text-pink-400 text-glow scale-110 transition-all duration-75";
+                    els.subText.textContent = "CLICK!";
+                    els.subText.className = "text-white text-lg md:text-xl font-bold mt-1";
                     break;
                 
                 case STATE.RESULT:
@@ -326,18 +379,15 @@
                     else feedback = "Keep practicing.";
                     
                     els.subText.textContent = feedback;
+                    els.subText.className = "text-muted text-sm md:text-base font-light mt-1";
                     break;
                 
                 case STATE.FALSE_START:
                     els.mainText.textContent = "Too Soon!";
-                    els.mainText.className = "font-display text-4xl md:text-6xl font-bold text-error text-glow transition-all duration-200";
+                    els.mainText.className = "font-display text-3xl md:text-5xl font-bold text-white text-glow transition-all duration-200";
                     els.subText.textContent = "You clicked before green";
-                    els.subText.className = "text-error/80 text-sm md:text-base font-light mt-1";
+                    els.subText.className = "text-white/80 text-sm md:text-base font-light mt-1";
                     break;
-            }
-            
-            if (state !== STATE.FALSE_START) {
-                els.subText.className = "text-muted text-sm md:text-base font-light mt-1";
             }
         }
 
@@ -383,6 +433,13 @@
             container.addEventListener('mousemove', onMouseMove, false);
             container.addEventListener('click', onMouseClick, false);
             container.addEventListener('touchstart', onTouchStart, {passive: false});
+            
+            document.addEventListener('keydown', (e) => {
+                if (e.code === 'Space') {
+                    e.preventDefault();
+                    handleGameInteraction();
+                }
+            });
 
             animate();
         }
@@ -523,7 +580,6 @@
                 }, 100);
 
             } else if (action === 'FALSE_START') {
-                // Set to red immediately
                 solidMesh.material.emissive.setHex(0xEF4444);
                 solidMesh.material.emissiveIntensity = 1.2;
                 solidMesh.material.color.setHex(0x7F1D1D);
@@ -539,7 +595,6 @@
             } else if (action === 'RESULT') {
                 setTimeout(() => {
                     targetRotationSpeed = 0.002;
-                    // Only reset colors if not in false start state
                     if (currentState !== STATE.FALSE_START) {
                         setWaitingColors();
                     }
@@ -576,7 +631,6 @@
                 } else if (currentState === STATE.WAITING) {
                     coreGroup.position.y = Math.sin(time * 8) * 0.08;
                 } else if (currentState === STATE.FALSE_START) {
-                    // Subtle pulse while in error state
                     const pulse = 1 + Math.sin(time * 10) * 0.02;
                     coreGroup.scale.x = pulse;
                     coreGroup.scale.y = pulse;
@@ -585,7 +639,6 @@
                     coreGroup.position.y = 0;
                 }
 
-                // Hover effects - only when not in special states
                 if (isHovering && currentState !== STATE.READY && currentState !== STATE.FALSE_START) {
                     coreGroup.scale.lerp(new THREE.Vector3(1.1, 1.1, 1.1), 0.1);
                 } else if (!isHovering && currentState !== STATE.FALSE_START) {
@@ -598,7 +651,6 @@
                 particles.rotation.x += 0.0005;
             }
 
-            // Only check hover when not in active game states
             if (!isHovering || (currentState !== STATE.READY && currentState !== STATE.FALSE_START)) {
                 checkIntersection();
             }
