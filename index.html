@@ -102,11 +102,6 @@
             justify-content: center;
             min-height: 0;
         }
-
-        /* Error shake animation for the game stage */
-        .false-start-shake {
-            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
-        }
     </style>
 </head>
 <body class="h-screen w-screen relative font-sans">
@@ -136,7 +131,6 @@
         </div>
 
         <div class="shrink-0 flex flex-col items-center gap-4 mb-2">
-            <!-- 5 Column Grid: Last, Avg, Best, Failed, Tries -->
             <div class="grid grid-cols-5 gap-2 md:gap-3 w-full max-w-3xl pointer-events-auto">
                 <div class="stat-card rounded-xl p-2 md:p-3 flex flex-col items-center justify-center">
                     <span class="text-muted text-[9px] md:text-[10px] uppercase tracking-wider font-bold mb-1">Last</span>
@@ -153,7 +147,6 @@
                     <span id="stat-best" class="font-display text-lg md:text-2xl font-bold text-ready">--</span>
                 </div>
 
-                <!-- NEW: Failed Stat -->
                 <div class="stat-card rounded-xl p-2 md:p-3 flex flex-col items-center justify-center border-error/20">
                     <span class="text-error/70 text-[9px] md:text-[10px] uppercase tracking-wider font-bold mb-1">Failed</span>
                     <span id="stat-failed" class="font-display text-lg md:text-2xl font-bold text-error">0</span>
@@ -186,7 +179,7 @@
         let stats = {
             attempts: [],
             count: 0,
-            failed: 0,  // NEW: Track false starts
+            failed: 0,
             best: Infinity,
             average: 0
         };
@@ -197,7 +190,7 @@
             statLast: document.getElementById('stat-last'),
             statAvg: document.getElementById('stat-avg'),
             statBest: document.getElementById('stat-best'),
-            statFailed: document.getElementById('stat-failed'),  // NEW
+            statFailed: document.getElementById('stat-failed'),
             statCount: document.getElementById('stat-count'),
             gameStage: document.getElementById('game-stage'),
         };
@@ -219,8 +212,12 @@
         }
 
         function startGame() {
-            // Reset from FALSE_START removes the shake class
+            // Remove shake effect if coming from false start
             els.gameStage.classList.remove('false-start-shake');
+            
+            // FIX: Explicitly reset colors to waiting state (blue) when starting new game
+            // This ensures transition from red (false start) to blue (waiting)
+            setWaitingColors();
             
             currentState = STATE.WAITING;
             updateUI(STATE.WAITING);
@@ -237,18 +234,27 @@
             }, delay);
         }
 
+        function setWaitingColors() {
+            if (!solidMesh || !wireMesh) return;
+            // Smooth transition back to blue
+            solidMesh.material.emissive.setHex(0x3B82F6);
+            solidMesh.material.emissiveIntensity = 0.3;
+            solidMesh.material.color.setHex(0x1E293B);
+            wireMesh.material.color.setHex(0x3B82F6);
+            wireMesh.material.opacity = 0.4;
+            targetRotationSpeed = 0.002;
+        }
+
         function triggerFalseStart() {
             clearTimeout(timerId);
             currentState = STATE.FALSE_START;
             
-            // Increment failed counter
             stats.failed++;
             els.statFailed.textContent = stats.failed;
             
             updateUI(STATE.FALSE_START);
             trigger3DAction('FALSE_START');
             
-            // Add shake effect to UI
             els.gameStage.classList.add('false-start-shake');
             setTimeout(() => {
                 els.gameStage.classList.remove('false-start-shake');
@@ -330,15 +336,11 @@
                     break;
             }
             
-            // Reset subtext color when not in error state
             if (state !== STATE.FALSE_START) {
                 els.subText.className = "text-muted text-sm md:text-base font-light mt-1";
             }
         }
 
-        /**
-         * THREE.JS - ENHANCED FALSE START VISUALS
-         */
         let scene, camera, renderer, coreGroup, wireMesh, solidMesh, particles;
         let raycaster, mouse;
         let time = 0;
@@ -521,18 +523,14 @@
                 }, 100);
 
             } else if (action === 'FALSE_START') {
-                // Dramatic red flash
+                // Set to red immediately
                 solidMesh.material.emissive.setHex(0xEF4444);
-                solidMesh.material.emissiveIntensity = 1.2;  // Brighter flash
-                solidMesh.material.color.setHex(0x7F1D1D);   // Dark red base
-                
+                solidMesh.material.emissiveIntensity = 1.2;
+                solidMesh.material.color.setHex(0x7F1D1D);
                 wireMesh.material.color.setHex(0xEF4444);
                 wireMesh.material.opacity = 0.9;
-                
-                // Violent shake rotation
                 targetRotationSpeed = -0.3;
                 
-                // Scale bounce effect
                 coreGroup.scale.set(0.9, 0.9, 0.9);
                 setTimeout(() => {
                     coreGroup.scale.set(1.05, 1.05, 1.05);
@@ -541,40 +539,17 @@
             } else if (action === 'RESULT') {
                 setTimeout(() => {
                     targetRotationSpeed = 0.002;
-                    reset3DColors();
+                    // Only reset colors if not in false start state
+                    if (currentState !== STATE.FALSE_START) {
+                        setWaitingColors();
+                    }
                 }, 300);
             }
         }
 
-        function reset3DColors() {
-            if (currentState === STATE.READY) return;
-            
-            // Don't reset if we're in false start state - keep it red until user clicks again
-            if (currentState === STATE.FALSE_START) {
-                solidMesh.material.emissive.setHex(0xEF4444);
-                solidMesh.material.emissiveIntensity = 0.6;
-                solidMesh.material.color.setHex(0x1E293B);
-                wireMesh.material.color.setHex(0xEF4444);
-                wireMesh.material.opacity = 0.6;
-                targetRotationSpeed = 0.002;
-                return;
-            }
-            
-            // Normal reset
-            solidMesh.material.emissive.setHex(0x3B82F6);
-            solidMesh.material.emissiveIntensity = 0.3;
-            solidMesh.material.color.setHex(0x1E293B);
-            wireMesh.material.color.setHex(0x3B82F6);
-            wireMesh.material.opacity = 0.4;
-        }
-
         function reset3DScene() {
             targetRotationSpeed = 0.002;
-            solidMesh.material.emissive.setHex(0x3B82F6);
-            solidMesh.material.emissiveIntensity = 0.3;
-            solidMesh.material.color.setHex(0x1E293B);
-            wireMesh.material.color.setHex(0x3B82F6);
-            wireMesh.material.opacity = 0.4;
+            setWaitingColors();
             coreGroup.rotation.set(0, 0, 0);
             coreGroup.scale.set(1, 1, 1);
         }
@@ -599,7 +574,6 @@
                     coreGroup.position.y = Math.sin(time * 1.5) * 0.15;
                     coreGroup.rotation.y += 0.002;
                 } else if (currentState === STATE.WAITING) {
-                    // Nervous shaking while waiting
                     coreGroup.position.y = Math.sin(time * 8) * 0.08;
                 } else if (currentState === STATE.FALSE_START) {
                     // Subtle pulse while in error state
@@ -611,6 +585,7 @@
                     coreGroup.position.y = 0;
                 }
 
+                // Hover effects - only when not in special states
                 if (isHovering && currentState !== STATE.READY && currentState !== STATE.FALSE_START) {
                     coreGroup.scale.lerp(new THREE.Vector3(1.1, 1.1, 1.1), 0.1);
                 } else if (!isHovering && currentState !== STATE.FALSE_START) {
@@ -623,6 +598,7 @@
                 particles.rotation.x += 0.0005;
             }
 
+            // Only check hover when not in active game states
             if (!isHovering || (currentState !== STATE.READY && currentState !== STATE.FALSE_START)) {
                 checkIntersection();
             }
