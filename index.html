@@ -102,6 +102,11 @@
             justify-content: center;
             min-height: 0;
         }
+
+        .stat-bar {
+            position: relative;
+            top: -50px;
+        }
     </style>
 </head>
 <body class="h-screen w-screen relative font-sans">
@@ -120,7 +125,6 @@
         </header>
 
         <div id="game-stage" class="game-stage">
-            <!-- Removed mb-4 to center text perfectly with 3D shape -->
             <div onclick="handleGameInteraction()" class="text-center pointer-events-auto select-none cursor-pointer">
                 <h2 id="main-text" class="font-display text-3xl md:text-5xl font-bold text-primary transition-all duration-200 text-glow opacity-90">
                     Ready?
@@ -131,8 +135,7 @@
             </div>
         </div>
 
-        <!-- Reduced gap and removed bottom margin to move stats higher -->
-        <div class="shrink-0 flex flex-col items-center gap-3 pointer-events-auto">
+        <div class="stat-bar shrink-0 flex flex-col items-center gap-3 pointer-events-auto">
             <div class="grid grid-cols-5 gap-2 md:gap-3 w-full max-w-3xl">
                 <div class="stat-card rounded-xl p-2 md:p-3 flex flex-col items-center justify-center">
                     <span class="text-muted text-[9px] md:text-[10px] uppercase tracking-wider font-bold mb-1">Last</span>
